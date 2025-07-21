@@ -1,4 +1,4 @@
-# `Shell Yap` Terminal Chat Application
+# `ShellYap` Terminal Chat Application
 
 ## Architecture Philosophy
 
