@@ -160,46 +160,109 @@ features when external services are unavailable.
 ### Directory Organization
 
 ```
-terminal-chat/
-├── cmd/
-│   ├── server/                 # Server entry point and CLI
+ShellYap
+├── cmd/                        # holds
+│   ├── server/                    # Server (chat's backend) entry point and CLI 
 │   │   ├── main.go
-│   │   └── commands/           # Cobra command definitions
-│   └── client/                 # Client entry point and CLI
+│   │   └── commands/                  # Cobra command
+│   │
+│   └── client/                    # Client (TUI: Terminal based chat interface) entry point and CLI
 │       ├── main.go
-│       └── commands/
-├── internal/                   # Private application code
+│       └── commands/                  # cobra commands
+│ 
+├── internal/                  # Private application code
+│   │
 │   ├── app/                   # Application core
 │   │   ├── chat/              # Chat business logic
 │   │   ├── user/              # User management
 │   │   ├── message/           # Message processing
-│   │   └── session/           # Session handling
+│   │   ├── session/           # Session handling
+│   │   └── sticker/           # ASCII stickers
+│   │
 │   ├── transport/             # Communication protocols
 │   │   ├── websocket/         # WebSocket implementation
-│   │   ├── ssh/               # SSH plugin (future)
+│   │   ├── ssh/               # SSH plugin (optonal advance)
 │   │   └── interfaces.go      # Transport contracts
+│   │
 │   ├── storage/               # Data persistence
 │   │   ├── postgres/          # PostgreSQL implementation
 │   │   ├── redis/             # Redis implementation
-│   │   ├── filesystem/        # Local file storage
+│   │   ├── filesystem/        # Local file storage (optional advance)
 │   │   └── interfaces.go      # Storage contracts
+│   │
 │   ├── tui/                   # Terminal UI components
 │   │   ├── models/            # Bubble Tea models
 │   │   ├── components/        # Reusable UI components
 │   │   └── styles/            # UI styling and themes
+│   │
 │   ├── config/                # Configuration management
+│   │
 │   └── plugin/                # Plugin system framework
+│
 ├── pkg/                       # Public packages (if needed)
+│
 ├── api/                       # API definitions (protobuf/openapi)
-├── configs/                   # Configuration files
-├── migrations/                # Database migrations
+│
+├── configs/                   # Raw configuration files
+│
+├── migrations/                # Database migrations, keeps track of how database evolves
+│
 ├── test/                      # Test utilities and fixtures
+│
 ├── docker/                    # Docker configurations
-└── docs/                      # Documentation
+│
+├── docs/                      # Documentation
+│
+└── assets/                    # To store files
+    └── stickers/
 ```
 
-### Core Interfaces
+**`internal/` (Core Business logic Details)**
 
+* `internal/app/` Bussiness logic other than UI and communication
+
+  - `app/chat/` Handles chat management logic
+    - ChatManager to track active rooms and users 
+
+  - `app/user/` Handles user logic (profile, credentials, etc.)
+    - UserManager (create, update, get)
+
+  - `app/message/` Processes, validates, stores, and routes messages.
+    - MessageHandler (save to DB, forward to sessions)
+
+  - `app/session/` Represents and tracks client connections/sessions.
+    - SessionManager to track all active sessions
+  
+
+* `internal/transport`
+
+  - `internal/Websocket/` WebSocket server: handles incoming messages, pings, upgrades.
+    - Handler: Routing messages to `internal/app`
+
+  - `transport/ssh/` (optional, advanced)
+
+* `internal/storage/` Persistence Layer
+
+  - `storage/postgres/` PostgreSQL logic.
+
+  - `redis/` Session storage, pub/sub queues, or caching.
+
+  - `filesystem` for ASCII avatars (optional advance)
+
+* `internal/tui` Ternimal based UI (Bubble Tea)
+
+  - `tui/models/` State machines (Bubble Tea Model) representing screens like chat, login, settings.
+
+  - `tui/components/` reusable UI widgets
+
+  - `tui/styles/` Handles color palette, theme loading
+    - Loader (advanced optional): loads from .toml, .json, or .lua. I would prefer .toml.
+
+* `internal/config` (advanced optional) manages .toml or .env flags. Go code that loads and applies config values
+
+* `internal/plugins` (advanced optional) framework dynamically load external features using .so or .wasm
+
+### Core Interfaces
 * Transport Interface
   - Enables pluggable communication protocols
 
@@ -253,7 +316,6 @@ The interface supports both mouse and keyboard interaction where the terminal al
 **Screen Architecture**:
 - **Login Screen**: Authentication and initial connection
 - **Chat Screen**: Primary messaging interface with sidebar
-- **Contacts Screen**: User management and contact lists
 - **Settings Screen**: Configuration and preferences
 - **Help Screen**: Command reference and documentation
 
@@ -293,25 +355,15 @@ through TLS for WebSocket connections and SSH for alternative transport methods.
 ## Testing Strategy (Once the work is done)
 
 - Unit Testing Approach
-
 - Integration Testing Framework
-
 - End-to-End Testing Suite
 
 ## Deployment and Operations
 
 - Single Binary Distribution
-
 - Container Strategy
 
 # Extensibility Framework
 
-### UI Customization Points
-
-The TUI framework supports theming, custom key bindings, and layout modifications through configuration files and plugin mechanisms.
-Using Toml file
-
-### Plugin Support
-Not decided
-
-
+- UI Customization Points
+- Plugin Support
