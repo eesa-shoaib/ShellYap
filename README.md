@@ -1,369 +1,323 @@
-# `Shell Yap` Terminal Chat Application
+# Shell Yap - Terminal Chat Application
 
-## Architecture Philosophy
+> A modern, real-time terminal-based chat application built with Go, PostgreSQL, and WebSocket technology.
+> Passion project to have a chat application that integrates with in one's development environment.
 
-The hybrid monolith approach strikes an optimal balance between development simplicity and architectural flexibility.
-This design enables rapid iteration during initial development while providing clear extension points for future features
-like peer-to-peer communication, alternative transport protocols, and third-party integrations.
+## Features
 
-The architecture emphasizes **interface-driven design** where core components communicate through well-defined interfaces,
-allowing for easy substitution of implementations without affecting the broader system.
+- **Real-time messaging** with WebSocket communication
+- **Terminal UI** powered by Bubble Tea framework
+- **Multi-user support** with session management
+- **Message persistence** with PostgreSQL
+- **Simple authentication** with JWT tokens
+- **Cross-platform** support (Linux, macOS, Windows)
+- **Lightweight** single binary distribution
 
-## System Architecture
+## Table of Contents
 
-### High-Level Component Design
+- [Quick Start](#-quick-start)
+- [Installation](#-installation)
+  - [Pre-built Binaries](#pre-built-binaries)
+  - [Build from Source](#build-from-source)
+  - [Using Docker](#using-docker)
+- [Configuration](#-configuration)
+  - [Server Configuration](#server-configuration)
+  - [Client Configuration](#client-configuration)
+  - [Environment Variables](#environment-variables)
+- [Usage](#-usage)
+  - [Starting the Server](#starting-the-server)
+  - [Connecting with Client](#connecting-with-client)
+  - [Commands Reference](#commands-reference)
+- [Architecture](#-architecture)
+  - [System Overview](#system-overview)
+  - [Database Schema](#database-schema)
+  - [WebSocket Protocol](#websocket-protocol)
+- [Development](#-development)
+  - [Prerequisites](#prerequisites)
+  - [Local Development Setup](#local-development-setup)
+  - [Running Tests](#running-tests)
+  - [Database Migrations](#database-migrations)
+- [API Documentation](#-api-documentation)
+  - [WebSocket Messages](#websocket-messages)
+  - [Authentication Flow](#authentication-flow)
+- [Troubleshooting](#-troubleshooting)
+  - [Common Issues](#common-issues)
+  - [Connection Problems](#connection-problems)
+  - [Database Issues](#database-issues)
+- [Contributing](#-contributing)
+  - [Code Guidelines](#code-guidelines)
+  - [Pull Request Process](#pull-request-process)
+  - [Issue Templates](#issue-templates)
+- [Security](#-security)
+  - [Security Policy](#security-policy)
+  - [Reporting Vulnerabilities](#reporting-vulnerabilities)
+- [Roadmap](#-roadmap)
+  - [Current Version (v1.0)](#current-version-v10)
+  - [Planned Features](#planned-features)
+  - [Future Enhancements](#future-enhancements)
+- [FAQ](#-faq)
+- [License](#-license)
+- [Acknowledgments](#-acknowledgments)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Terminal Chat Application                    │
-│                         (Single Binary)                         │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌───────────────┐    ┌─────────────────┐    ┌─────────────────┐│
-│  │   TUI Layer   │    │  Command Layer  │    │  Plugin System  ││
-│  │ (Bubble Tea)  │    │    (Cobra)      │    │  (Interfaces)   ││
-│  └───────┬───────┘    └─────────┬───────┘    └─────────┬───────┘│
-│          │                      │                      │        │
-│  ┌───────┴──────────────────────┴──────────────────────┴──────┐ │
-│  │                  Application Core                          │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │ │
-│  │  │   Message   │  │    User     │  │     Session         │ │ │
-│  │  │   Manager   │  │   Manager   │  │     Manager         │ │ │
-│  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │ │
-│  └─────────────────────────┬──────────────────────────────────┘ │
-│                            │                                    │
-│  ┌─────────────────────────┴──────────────────────────────────┐ │
-│  │                 Transport Layer                            │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │ │
-│  │  │  WebSocket  │  │ SSH Plugin  │  │    Future P2P       │ │ │
-│  │  │  (Primary)  │  │ (Optional)  │  │    (Extensible)     │ │ │
-│  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │ │
-│  └─────────────────────────┬──────────────────────────────────┘ │
-│                            │                                    │
-│  ┌─────────────────────────┴──────────────────────────────────┐ │
-│  │                 Storage Layer                              │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │ │
-│  │  │ PostgreSQL  │  │    Redis    │  │   Local Storage     │ │ │
-│  │  │ (Messages,  │  │ (Sessions,  │  │  (Avatars, Files,   │ │ │
-│  │  │  Users,     │  │  Queues,    │  │     Configs)        │ │ │
-│  │  │  Search)    │  │  Cache)     │  │                     │ │ │
-│  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Quick Start
 
-### Core Design Principles
+```bash
+# 1. Start PostgreSQL database
+docker run -d --name shellyap-db \
+  -e POSTGRES_DB=shellyap \
+  -e POSTGRES_USER=shellyap \
+  -e POSTGRES_PASSWORD=password \
+  -p 5432:5432 postgres:15
 
-**Modular Boundaries**: While contained in a single binary, the application maintains clear module boundaries through Go
-packages and interfaces, enabling easy testing and future extraction if needed.
+# 2. Download and run server
+./shellyap-server serve --port 8080
 
-**Plugin-Ready Architecture**: All external communication protocols implement a common `Transport` interface, making it
-trivial to add new connection methods without changing core business logic.
-
-**Configuration-Driven**: The application behavior adapts through YAML configuration and environment variables, supporting
-different deployment scenarios without code changes.
-
-**Graceful Degradation**: Components like Redis caching are optional, allowing the application to function with reduced
-features when external services are unavailable.
-
-**_Application Manager_**
-
-  1. Message Manager
-
-  - `Responsibilities`
-
-    - Sending and receiving messages.
-    - Formatting, validating, and routing messages.
-    - Handling message history, deletion, and edits.
-    - Filtering (e.g., for banned words or user mutes).
-
-  - `Interacts with`
-
-    - WebSocket transport for real-time sending/receiving.
-    - PostgreSQL for storing messages.
-    - Redis for queueing and broadcasting to active sessions.
-
-  2. User Manager
-
-  - `Responsibilities`
-
-    - Handling user creation, updates, and deletions.
-    - Managing display names, avatars, and bios.
-    - Validating credentials and user permissions.
-
-  - `Interacts with`
-
-    - PostgreSQL for persistent user info.
-    - Local file system for avatar images.
-    - Redis (optionally) to cache user data.
-
-  3. Session Manager
-
-  - `Responsibilities`
-
-    - Authenticating users (login/logout, token validation).
-    - Maintaining active sessions (who is online, where).
-    - Preventing duplicate logins or session hijacking.
-    - Timeout or expiration logic.
-
-  - `Interacts with`
-
-    - Redis for fast, in-memory session storage.
-    - PostgreSQL for logging session history.
-
-
-**_Transport Layer_**
-
-  1. `WebSocket Server`
-
-  - Maintains persistent connections with clients.
-  - Authenticates the connection via session tokens (checked with Redis).
-  - Maps active users to their connections.
-  - Sends/receives message packets, user status changes, typing indicators, etc.
-
-  2. `Connection Manager`
-
-  - Tracks all open WebSocket connections.
-  - Handles reconnections, timeouts, and dropped clients.
-  - Manages broadcasting (e.g., delivering one user’s message to all relevant recipients).
-  - Queues delivery to offline users (through Redis or database fallback).
-  - SSH for future implementation
-
-  3. `Packet Formatter`
-
-  - Encodes/decodes the message format over the wire (usually JSON or a custom binary protocol).
-  - Adds metadata like timestamps, sender ID, message type (chat, system, file, etc.).
-
-
-**_Storage Layer_**
-
-  1. `PostgreSQL`
-
-  - `Messages:` Stored with timestamps, sender IDs, and content for history/search.
-  - `Users:` Contains username, hashed password, metadata, join dates, etc.
-  - `Search:` Full-text indexes or trigram similarity for fast querying of messages or usernames.
-
-  2. `Redis` Used as an in-memory store for fast access to frequently changing or ephemeral data.
-
-  - `Sessions:` Store current active session tokens with TTLs.
-  - `Queues:` Pub/Sub or task queues (e.g., broadcasting messages to online users).
-  - `Cache:` Store user data, recent messages, search results to avoid hitting Postgres too often.
-
-  3. `Local File Storage` Used for binary data and configuration that doesn’t belong in a database.
-
-  - `Avatars:` Images linked to user profiles.
-  - `Files:` Attachments users send in chats.
-  - `Configs:` Local client-side configuration (like themes or preferences), especially for TUI.
-
-
-## Project Structure
-
-### Directory Organization
-
-```
-ShellYap
-├── cmd/                        # holds
-│   ├── server/                    # Server (chat's backend) entry point and CLI 
-│   │   ├── main.go
-│   │   └── commands/                  # Cobra command
-│   │
-│   └── client/                    # Client (TUI: Terminal based chat interface) entry point and CLI
-│       ├── main.go
-│       └── commands/                  # cobra commands
-│ 
-├── internal/                  # Private application code
-│   │
-│   ├── app/                   # Application core
-│   │   ├── chat/              # Chat business logic
-│   │   ├── user/              # User management
-│   │   ├── message/           # Message processing
-│   │   ├── session/           # Session handling
-│   │   └── sticker/           # ASCII stickers
-│   │
-│   ├── transport/             # Communication protocols
-│   │   ├── websocket/         # WebSocket implementation
-│   │   ├── ssh/               # SSH plugin (optonal advance)
-│   │   └── interfaces.go      # Transport contracts
-│   │
-│   ├── storage/               # Data persistence
-│   │   ├── postgres/          # PostgreSQL implementation
-│   │   ├── redis/             # Redis implementation
-│   │   ├── filesystem/        # Local file storage (optional advance)
-│   │   └── interfaces.go      # Storage contracts
-│   │
-│   ├── tui/                   # Terminal UI components
-│   │   ├── models/            # Bubble Tea models
-│   │   ├── components/        # Reusable UI components
-│   │   └── styles/            # UI styling and themes
-│   │
-│   ├── config/                # Configuration management
-│   │
-│   └── plugin/                # Plugin system framework
-│
-├── pkg/                       # Public packages (if needed)
-│
-├── api/                       # API definitions (protobuf/openapi)
-│
-├── configs/                   # Raw configuration files
-│
-├── migrations/                # Database migrations, keeps track of how database evolves
-│
-├── test/                      # Test utilities and fixtures
-│
-├── docker/                    # Docker configurations
-│
-├── docs/                      # Documentation
-│
-└── assets/                    # To store files
-    └── stickers/
+# 3. Connect with client (in another terminal)
+./shellyap-client connect --server localhost:8080
 ```
 
-**`internal/` (Core Business logic Details)**
+## Installation
 
-* `internal/app/` Bussiness logic other than UI and communication
+### Environment Variables
 
-  - `app/chat/` Handles chat management logic
-    - ChatManager to track active rooms and users 
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_URL` | PostgreSQL connection string | Required |
+| `SERVER_PORT` | Server port number | `8080` |
+| `JWT_SECRET` | JWT signing secret | Required |
+| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
 
-  - `app/user/` Handles user logic (profile, credentials, etc.)
-    - UserManager (create, update, get)
+## Usage
 
-  - `app/message/` Processes, validates, stores, and routes messages.
-    - MessageHandler (save to DB, forward to sessions)
+### Starting the Server
 
-  - `app/session/` Represents and tracks client connections/sessions.
-    - SessionManager to track all active sessions
-  
+### Connecting with Client
 
-* `internal/transport`
+### Commands Reference
 
-  - `internal/Websocket/` WebSocket server: handles incoming messages, pings, upgrades.
-    - Handler: Routing messages to `internal/app`
+#### Server Commands
+- `serve` - Start the chat server
+- `migrate` - Run database migrations
+- `version` - Show version information
 
-  - `transport/ssh/` (optional, advanced)
+#### Client Commands
+- `connect` - Connect to chat server
+- `version` - Show version information
 
-* `internal/storage/` Persistence Layer
+#### In-Chat Commands
+- `/help` - Show available commands
+- `/quit` - Exit the application
+- `/users` - List online users
+- `/clear` - Clear chat history
 
-  - `storage/postgres/` PostgreSQL logic.
+## Architecture
 
-  - `redis/` Session storage, pub/sub queues, or caching.
+### System Overview
 
-  - `filesystem` for ASCII avatars (optional advance)
+Shell Yap follows a client-server architecture with real-time WebSocket communication:
 
-* `internal/tui` Ternimal based UI (Bubble Tea)
+- **Client**: Terminal UI built with Bubble Tea
+- **Server**: Go HTTP/WebSocket server
+- **Database**: PostgreSQL for persistence
+- **Protocol**: JSON over WebSocket
 
-  - `tui/models/` State machines (Bubble Tea Model) representing screens like chat, login, settings.
+### Database Schema
 
-  - `tui/components/` reusable UI widgets
+```sql
+-- Users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    joined_at TIMESTAMP DEFAULT NOW()
+);
 
-  - `tui/styles/` Handles color palette, theme loading
-    - Loader (advanced optional): loads from .toml, .json, or .lua. I would prefer .toml.
+-- Messages table
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    content TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT NOW()
+);
 
-* `internal/config` (advanced optional) manages .toml or .env flags. Go code that loads and applies config values
+-- Sessions table
+CREATE TABLE sessions (
+    token VARCHAR(255) PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP NOT NULL
+);
+```
 
-* `internal/plugins` (advanced optional) framework dynamically load external features using .so or .wasm
+### WebSocket Protocol
 
-### Core Interfaces
-* Transport Interface
-  - Enables pluggable communication protocols
+Messages are exchanged as JSON objects:
 
-* Storage Interface
-  - Enables pluggable storage backends
+```json
+{
+  "type": "message",
+  "data": {
+    "content": "Hello, world!",
+    "timestamp": "2024-01-01T12:00:00Z"
+  }
+}
+```
 
-* Plugin Interface
-  - Enables extensible functionality
+## Development
 
-## Feature Implementation Strategy
+### Prerequisites
 
-### Real-Time Messaging Core
+- Go 1.21 or higher
+- PostgreSQL 13 or higher
+- Make (for build automation)
 
-The messaging system operates through a central message hub that manages all communication flows. Messages are typed
-and structured, supporting various content types while maintaining extensibility for future message formats.
+### Local Development Setup
 
-**Message Flow Architecture**:
-1. TUI captures user input and creates message objects
-2. Message manager validates and processes messages
-3. Transport layer handles delivery to recipients
-4. Storage layer persists messages for history and search
-5. Delivery confirmations flow back through the same path
+```bash
+# Clone repository
+git clone https://github.com/yourusername/shellyap.git
+cd shellyap
 
-### User Management System
+# Install dependencies
+go mod download
 
-User management encompasses authentication, profile management, and relationship handling (contacts, blocking).
-The system maintains user sessions across application restarts through persistent storage.
+# Start PostgreSQL (using Docker)
 
-**Authentication Flow**:
-- JWT-based session tokens with configurable expiration
-- bcrypt password hashing with adjustable cost factors
-- Session persistence through Redis or database fallback
-- Automatic session refresh and cleanup processes
+# Run database migrations
 
-### Command System Integration
+# Start development server
 
-The Cobra framework provides structured command handling with automatic help generation and command completion.
-Commands are organized hierarchically and support both interactive and batch execution modes.
+# In another terminal, start client
+```
 
-**Command Categories**:
-- **Connection Commands**: Login, logout, connect, disconnect
-- **Message Commands**: Send, reply, edit, delete, search
-- **User Commands**: Profile, contacts, block, unblock
-- **System Commands**: Status, settings, help, quit
+### Running Tests
 
-### TUI Implementation Strategy
+### Database Migrations
 
-Bubble Tea models represent different application states and screens, with smooth transitions between modes.
-The interface supports both mouse and keyboard interaction where the terminal allows.
+## 📚 API Documentation
 
-**Screen Architecture**:
-- **Login Screen**: Authentication and initial connection
-- **Chat Screen**: Primary messaging interface with sidebar
-- **Settings Screen**: Configuration and preferences
-- **Help Screen**: Command reference and documentation
+### WebSocket Messages
 
-### Storage and Caching Strategy
+#### Message Types
 
-PostgreSQL serves as the source of truth for all persistent data, with Redis providing performance enhancements
-through caching and real-time features like message queuing for offline users.
+| Type | Direction | Description |
+|------|-----------|-------------|
+| `auth` | Client → Server | Authentication request |
+| `message` | Bidirectional | Chat message |
+| `user_joined` | Server → Client | User joined notification |
+| `user_left` | Server → Client | User left notification |
+| `error` | Server → Client | Error message |
 
-**Data Flow**:
-- **Write Operations**: Direct to PostgreSQL with Redis cache invalidation
-- **Read Operations**: Redis cache first, PostgreSQL fallback
-- **Search Operations**: PostgreSQL full-text search with result caching
-- **File Storage**: Local filesystem with configurable storage paths
+#### Authentication Flow
 
-## Configuration Architecture
+1. Client connects to WebSocket endpoint
+2. Server sends auth challenge
+3. Client responds with credentials
+4. Server validates and sends JWT token
+5. Client uses token for subsequent requests
 
-### Layered Configuration System
+### WebSocket Examples
 
-Configuration loading follows a hierarchical approach:
-1. **Default Values**: Hardcoded sensible defaults
-2. **Configuration Files**: YAML files for structured configuration
-3. **Environment Variables**: Override any configuration value
-4. **Command Line Flags**: Override specific values for single execution
+```json
+// Client authentication
+{
+  "type": "auth",
+  "data": {
+    "username": "alice",
+    "password": "secret123"
+  }
+}
 
-## Security Implementation
+// Server response
+{
+  "type": "auth_success",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "123e4567-e89b-12d3-a456-426614174000"
+  }
+}
 
-### Authentication and Authorization
+// Send message
+{
+  "type": "message",
+  "data": {
+    "content": "Hello everyone!"
+  }
+}
+```
 
-JWT tokens carry user identity and permissions, with configurable expiration and automatic refresh capabilities.
-The system supports multiple authentication methods through pluggable authentication providers.
+##  Troubleshooting
 
-### Data Protection
+### Common Issues
 
-All sensitive data is encrypted at rest using industry-standard encryption algorithms. Connection security is enforced
-through TLS for WebSocket connections and SSH for alternative transport methods.
+### Connection Problems
 
-## Testing Strategy (Once the work is done)
+### Database Issues
 
-- Unit Testing Approach
-- Integration Testing Framework
-- End-to-End Testing Suite
+### Code Guidelines
 
-## Deployment and Operations
+- Follow [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
+- Add tests for new features
+- Update documentation as needed
+- Use conventional commit messages
 
-- Single Binary Distribution
-- Container Strategy
+### Pull Request Process
 
-# Extensibility Framework
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests and documentation
+5. Submit a pull request
 
-- UI Customization Points
-- Plugin Support
+## Security
+
+### Security Policy
+
+### Reporting Vulnerabilities
+
+**Do not open public issues for security vulnerabilities.**
+
+## Roadmap
+
+### Current Version (v1.0)
+- Real-time messaging
+- User authentication
+- Terminal UI
+- PostgreSQL persistence
+
+### Planned Features
+- Message editing and deletion
+- File sharing
+- User profiles and avatars
+- Chat rooms and channels
+
+### Future Enhancements
+- End-to-end encryption
+- Redis caching layer
+- Plugin system
+- Message search
+- Emoji and sticker support
+
+## FAQ
+
+**Q: Can I run Shell Yap on Windows?**
+A: Yes, Shell Yap supports Windows, Linux, and macOS.
+
+**Q: Does Shell Yap support multiple chat rooms?**
+A: Currently, Shell Yap supports a single global chat room. Multiple rooms are planned for v2.0.
+
+**Q: How do I backup my chat history?**
+A: Use PostgreSQL dump tools to backup your database
+
+## License
+
+## Acknowledgments
+
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
+- [Gorilla WebSocket](https://github.com/gorilla/websocket) - WebSocket implementation
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [PostgreSQL](https://postgresql.org) - Database system
+
+---
+
+**Made with ❤️ by the Shell Yap team**
