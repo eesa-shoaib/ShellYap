@@ -1,4 +1,4 @@
-# Shell Yap - Terminal Chat Application
+# `ShellYap` Terminal Chat Application
 
 > A modern, real-time terminal-based chat application built with Go, PostgreSQL, and WebSocket technology.
 > Passion project to have a chat application that integrates with in one's development environment.
